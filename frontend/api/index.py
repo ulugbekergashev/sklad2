@@ -1,7 +1,9 @@
 import sys
 import os
 
-# Get project root
+# The function is in frontend/api/index.py
+# The backend is in frontend/backend
+# When running on Vercel, the 'frontend' folder is the root.
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, root)
 sys.path.insert(0, os.path.join(root, 'backend'))
@@ -10,7 +12,7 @@ sys.path.insert(0, os.path.join(root, 'backend'))
 os.environ["VERCEL"] = "1"
 
 try:
-    from main import app
+    from backend.main import app
 except Exception as e:
     from fastapi import FastAPI
     from fastapi.responses import JSONResponse
@@ -25,7 +27,8 @@ except Exception as e:
             "error": str(e),
             "traceback": traceback.format_exc(),
             "sys_path": sys.path,
-            "cwd": os.getcwd()
+            "cwd": os.getcwd(),
+            "files": os.listdir(root) if os.path.exists(root) else "not found"
         }
 
     @app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE"])
@@ -33,7 +36,7 @@ except Exception as e:
         return JSONResponse(
             status_code=500,
             content={
-                "message": "Backend import failed",
+                "message": "Backend module import failed",
                 "error": str(e),
                 "traceback": traceback.format_exc()
             }
