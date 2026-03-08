@@ -5,6 +5,8 @@ from database import engine, Base
 from models import User
 from auth import hash_password
 from database import SessionLocal
+import traceback
+from fastapi.responses import JSONResponse
 
 # Import routers
 from routers.auth import router as auth_router
@@ -22,6 +24,17 @@ from routers.ai_assistant import router as ai_router
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Sklad WMS", version="1.0.0")
+
+@app.exception_handler(Exception)
+async def debug_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "message": "Internal Server Error",
+            "error": str(exc),
+            "traceback": traceback.format_exc()
+        }
+    )
 
 # CORS
 app.add_middleware(
