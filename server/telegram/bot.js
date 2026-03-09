@@ -200,6 +200,32 @@ export function initBot(app) {
         }
     }
 
+    if (!botInstance.activePromises) {
+        botInstance.activePromises = new Set();
+        
+        const originalOn = botInstance.on.bind(botInstance);
+        botInstance.on = (event, listener) => {
+            return originalOn(event, (...args) => {
+                const result = listener(...args);
+                if (result && result.catch) {
+                    botInstance.activePromises.add(result);
+                    result.finally(() => botInstance.activePromises.delete(result)).catch(() => {});
+                }
+            });
+        };
+
+        const originalOnText = botInstance.onText.bind(botInstance);
+        botInstance.onText = (regexp, listener) => {
+            return originalOnText(regexp, (msg, match) => {
+                const result = listener(msg, match);
+                if (result && result.catch) {
+                    botInstance.activePromises.add(result);
+                    result.finally(() => botInstance.activePromises.delete(result)).catch(() => {});
+                }
+            });
+        };
+    }
+
     const bot = botInstance;
 
     // /start buyrug'i

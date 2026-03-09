@@ -42,10 +42,18 @@ app.use('/api/ai', authMiddleware, aiRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
 
 // Telegram Webhook endpoint (for Vercel)
-app.post('/api/telegram-webhook', (req, res) => {
+app.post('/api/telegram-webhook', async (req, res) => {
     const bot = getBot();
     if (bot) {
         bot.processUpdate(req.body);
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        let activePromises = Array.from(bot.activePromises || []);
+        while (activePromises.length > 0) {
+            await Promise.allSettled(activePromises);
+            activePromises = Array.from(bot.activePromises || []);
+        }
     }
     res.sendStatus(200);
 });
