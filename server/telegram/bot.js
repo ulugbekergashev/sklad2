@@ -59,6 +59,7 @@ ACTION TURLARI:
 3. "outgoing" — chiqim: {"action": "outgoing", "product_name": "nomi", "quantity": 5, "unit_price": 10000, "paid_amount": 0, "counterparty_name": "mijoz", "message": "..."}
 4. "payment" — qarz to'lash: {"action": "payment", "counterparty_name": "ism", "amount": 50000, "message": "..."}
 5. "add_product" — yangi mahsulot: {"action": "add_product", "name": "nomi", "sku": "SKU001", "unit": "dona", "price": 5000, "initial_stock": 100, "message": "..."}
+6. "request" — zayavka (buyurtma) olish: {"action": "request", "client_name": "ism", "product_name": "mahsulot", "quantity": 10, "expected_date": "2024-03-20", "message": "..."}
 
 MUHIM: Har doim JSON formatda javob ber. O'zbek tilida javob yoz.`;
 
@@ -202,14 +203,14 @@ export function initBot(app) {
 
     if (!botInstance.activePromises) {
         botInstance.activePromises = new Set();
-        
+
         const originalOn = botInstance.on.bind(botInstance);
         botInstance.on = (event, listener) => {
             return originalOn(event, (...args) => {
                 const result = listener(...args);
                 if (result && result.catch) {
                     botInstance.activePromises.add(result);
-                    result.finally(() => botInstance.activePromises.delete(result)).catch(() => {});
+                    result.finally(() => botInstance.activePromises.delete(result)).catch(() => { });
                 }
             });
         };
@@ -220,7 +221,7 @@ export function initBot(app) {
                 const result = listener(msg, match);
                 if (result && result.catch) {
                     botInstance.activePromises.add(result);
-                    result.finally(() => botInstance.activePromises.delete(result)).catch(() => {});
+                    result.finally(() => botInstance.activePromises.delete(result)).catch(() => { });
                 }
             });
         };
@@ -457,6 +458,8 @@ export function initBot(app) {
                     successMsg += `\nQoldiq qarz: *${new Intl.NumberFormat('uz-UZ').format(result.debtRemaining)}* so'm`;
                 } else if (result.action === 'add_product') {
                     successMsg += `\n\n📦 *${result.productName}* (${result.productSku}) qo'shildi`;
+                } else if (result.action === 'request') {
+                    successMsg += `\n\n👤 ${result.clientName}: *${result.productName}* (${result.quantity}) uchun zayavka yaratildi`;
                 }
 
                 bot.sendMessage(chatId, successMsg, { parse_mode: 'Markdown' });

@@ -154,6 +154,41 @@ export async function executeAction(aiResponse, originalMessage, userId = 1) {
         } catch (err) {
             return { action: 'info', message: 'Mahsulot qo\'shishda xatolik.' };
         }
+    } else if (aiResponse.action === 'request') {
+        try {
+            const { Request, Product } = await import('../models/index.js');
+            // Mahsulotni izlash (ixtiyoriy)
+            let productId = null;
+            if (aiResponse.product_name) {
+                const product = await Product.findOne({
+                    where: sequelize.where(
+                        sequelize.fn('LOWER', sequelize.col('name')),
+                        sequelize.fn('LOWER', aiResponse.product_name)
+                    ),
+                });
+                if (product) productId = product.id;
+            }
+
+            const request = await Request.create({
+                client_name: aiResponse.client_name || 'Noma\'lum',
+                phone: aiResponse.phone || null,
+                product_id: productId,
+                product_name: aiResponse.product_name,
+                quantity: parseFloat(aiResponse.quantity || 0),
+                expected_date: aiResponse.expected_date ? new Date(aiResponse.expected_date) : null,
+                notes: `Telegram AI: ${originalMessage}`,
+                status: 'pending',
+                created_by: userId,
+            });
+
+            result.executed = true;
+            result.clientName = request.client_name;
+            result.productName = aiResponse.product_name;
+            result.quantity = request.quantity;
+        } catch (err) {
+            console.error('Request action error:', err);
+            return { action: 'info', message: 'Zayavka yaratishda xatolik.' };
+        }
     }
 
     return result;
@@ -222,6 +257,16 @@ export function buildConfirmationMessage(aiResponse) {
         if (aiResponse.price) msg += `💰 Narxi: *${fmt(aiResponse.price)}* so'm\n`;
         if (aiResponse.initial_stock) msg += `📊 Boshlang'ich zaxira: *${aiResponse.initial_stock}*\n`;
         msg += `\n*Shuni bajarishni xohlaysizmi?*`;
+        return msg;
+    }
+
+    if (aiResponse.action === 'request') {
+        let msg = `📝 *Yangi zayavka (buyurtma)*\n\n`;
+        msg += `👤 Mijoz: *${aiResponse.client_name || 'Noma\'lum'}*\n`;
+        msg += `📦 Mahsulot: *${aiResponse.product_name || '-'}*\n`;
+        msg += `📏 Miqdor: *${aiResponse.quantity || 0}*\n`;
+        if (aiResponse.expected_date) msg += `📅 Sana: *${aiResponse.expected_date}*\n`;
+        msg += `\n*Shuni saqlashni xohlaysizmi?*`;
         return msg;
     }
 
