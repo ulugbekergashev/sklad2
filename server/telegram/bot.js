@@ -163,17 +163,44 @@ async function transcribeVoice(fileBuffer) {
 }
 
 /**
- * Telegram botni ishga tushirish
+ * Telegram botni ishga tushirish (Webhook yoki Polling)
  */
-export function startBot() {
+let botInstance = null;
+
+export function getBot() {
+    return botInstance;
+}
+
+export function initBot(app) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) {
         console.log('⚠️  TELEGRAM_BOT_TOKEN topilmadi, bot ishga tushmaydi');
         return null;
     }
 
-    const bot = new TelegramBot(token, { polling: true });
-    console.log('🤖 Telegram bot ishga tushdi');
+    const isWebhook = !!process.env.VERCEL;
+
+    if (!botInstance) {
+        if (isWebhook) {
+            botInstance = new TelegramBot(token); // Polling o'chirilgan
+
+            // Webhook o'rnatish
+            const domain = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+            if (domain) {
+                const url = `https://${domain}/api/telegram-webhook`;
+                botInstance.setWebHook(url).then(() => {
+                    console.log(`🤖 Telegram Webhook o'rnatildi: ${url}`);
+                }).catch(err => console.error('Webhook error:', err));
+            } else {
+                console.log('⚠️ Vercel domeni topilmadi, webhook o\'rnatilmadi.');
+            }
+        } else {
+            botInstance = new TelegramBot(token, { polling: true });
+            console.log('🤖 Telegram bot ishga tushdi (Polling)');
+        }
+    }
+
+    const bot = botInstance;
 
     // /start buyrug'i
     bot.onText(/\/start/, async (msg) => {

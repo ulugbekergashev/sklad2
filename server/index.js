@@ -17,7 +17,7 @@ import dashboardRoutes from './routes/dashboard.js';
 import aiRoutes from './routes/ai.js';
 import userRoutes from './routes/users.js';
 import authMiddleware from './middleware/auth.js';
-import { startBot } from './telegram/bot.js';
+import { initBot, getBot } from './telegram/bot.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -41,31 +41,52 @@ app.use('/api/dashboard', authMiddleware, dashboardRoutes);
 app.use('/api/ai', authMiddleware, aiRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
 
+// Telegram Webhook endpoint (for Vercel)
+app.post('/api/telegram-webhook', (req, res) => {
+    const bot = getBot();
+    if (bot) {
+        bot.processUpdate(req.body);
+    }
+    res.sendStatus(200);
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Start server
-const start = async () => {
+// Database and Server Init
+const initServer = async () => {
     try {
         await sequelize.authenticate();
         console.log('✅ Database ulanishi muvaffaqiyatli');
 
-        await sequelize.sync({ alter: true });
-        console.log('✅ Database jadvallari sinxronlashtirildi');
+        // Vercel serverless muhitida alter: true qilmaymiz, ortiqcha yuk.
+        if (!process.env.VERCEL) {
+            await sequelize.sync({ alter: true });
+            console.log('✅ Database jadvallari sinxronlashtirildi');
+        }
+    } catch (error) {
+        console.error('❌ DB Xatoligi:', error);
+    }
+};
 
+if (process.env.VERCEL) {
+    // Vercel (Serverless) muhitida app.listen chaqirilmaydi
+    initServer();
+    initBot(app);
+} else {
+    // Local (Polling) muhitida
+    const start = async () => {
+        await initServer();
         app.listen(PORT, () => {
             console.log(`🚀 Server ${PORT}-portda ishga tushdi`);
             console.log(`   http://localhost:${PORT}`);
         });
+        initBot(app);
+    };
+    start();
+}
 
-        // Telegram bot
-        startBot();
-    } catch (error) {
-        console.error('❌ Server ishga tushirishda xatolik:', error);
-        process.exit(1);
-    }
-};
-
-start();
+// Vercel uchun xizmat qiladi
+export default app;
