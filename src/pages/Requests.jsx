@@ -13,6 +13,7 @@ export default function Requests({ token }) {
     });
     const [result, setResult] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, id: null, title: '', message: '' });
 
     const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 
@@ -70,7 +71,6 @@ export default function Requests({ token }) {
     };
 
     const handleUpdateStatus = async (id, newStatus) => {
-        if (!confirm(`Haqiqatan ham buyurtma holatini ruxsat etmoqchimisiz?`)) return;
         try {
             const res = await fetch(`/api/requests/${id}`, {
                 method: 'PUT', headers,
@@ -83,11 +83,12 @@ export default function Requests({ token }) {
             }
         } catch (err) {
             alert('Server xatosi');
+        } finally {
+            setConfirmModal({ isOpen: false, type: null, id: null, title: '', message: '' });
         }
     };
 
     const handleDelete = async (id) => {
-        if (!confirm('Haqiqatan ham ushbu buyurtmani o`chirmoqchimisiz?')) return;
         try {
             const res = await fetch(`/api/requests/${id}`, {
                 method: 'DELETE', headers,
@@ -99,6 +100,20 @@ export default function Requests({ token }) {
             }
         } catch (err) {
             alert('Server xatosi');
+        } finally {
+            setConfirmModal({ isOpen: false, type: null, id: null, title: '', message: '' });
+        }
+    };
+
+    const confirmAction = (type, id, title, message) => {
+        setConfirmModal({ isOpen: true, type, id, title, message });
+    };
+
+    const executeConfirmAction = () => {
+        if (confirmModal.type === 'completed' || confirmModal.type === 'cancelled') {
+            handleUpdateStatus(confirmModal.id, confirmModal.type);
+        } else if (confirmModal.type === 'delete') {
+            handleDelete(confirmModal.id);
         }
     };
 
@@ -205,39 +220,43 @@ export default function Requests({ token }) {
                                     {req.status === 'pending' && (
                                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                                             <button
-                                                onClick={() => handleUpdateStatus(req.id, 'completed')}
+                                                type="button"
+                                                onClick={() => confirmAction('completed', req.id, 'Bajarildi', 'Haqiqatan ham buyurtma holatini ruxsat etmoqchimisiz?')}
                                                 className="btn-icon"
                                                 title="Bajarildi"
-                                                style={{ color: 'var(--success)' }}
+                                                style={{ color: 'var(--success)', cursor: 'pointer', zIndex: 10, position: 'relative' }}
                                             >
-                                                <CheckCircle size={18} />
+                                                <CheckCircle size={18} style={{ pointerEvents: 'none' }} />
                                             </button>
                                             <button
-                                                onClick={() => handleUpdateStatus(req.id, 'cancelled')}
+                                                type="button"
+                                                onClick={() => confirmAction('cancelled', req.id, 'Bekor qilish', 'Haqiqatan ham buyurtma holatini bekor qilishingizni tasdiqlaysizmi?')}
                                                 className="btn-icon"
                                                 title="Bekor qilish"
-                                                style={{ color: 'var(--warning)' }}
+                                                style={{ color: 'var(--warning)', cursor: 'pointer', zIndex: 10, position: 'relative' }}
                                             >
-                                                <XCircle size={18} />
+                                                <XCircle size={18} style={{ pointerEvents: 'none' }} />
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(req.id)}
+                                                type="button"
+                                                onClick={() => confirmAction('delete', req.id, 'O\'chirish', 'Haqiqatan ham ushbu buyurtmani o\'chirmoqchimisiz?')}
                                                 className="btn-icon"
                                                 title="O'chirish"
-                                                style={{ color: 'var(--danger)' }}
+                                                style={{ color: 'var(--danger)', cursor: 'pointer', zIndex: 10, position: 'relative' }}
                                             >
-                                                <X size={18} />
+                                                <X size={18} style={{ pointerEvents: 'none' }} />
                                             </button>
                                         </div>
                                     )}
                                     {req.status !== 'pending' && (
                                         <button
-                                            onClick={() => handleDelete(req.id)}
+                                            type="button"
+                                            onClick={() => confirmAction('delete', req.id, 'O\'chirish', 'Haqiqatan ham ushbu buyurtmani o\'chirmoqchimisiz?')}
                                             className="btn-icon"
                                             title="O'chirish"
-                                            style={{ color: 'var(--danger)' }}
+                                            style={{ color: 'var(--danger)', cursor: 'pointer', display: 'inline-flex', zIndex: 10, position: 'relative' }}
                                         >
-                                            <X size={18} />
+                                            <X size={18} style={{ pointerEvents: 'none' }} />
                                         </button>
                                     )}
                                 </td>
@@ -311,6 +330,28 @@ export default function Requests({ token }) {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Confirm Modal */}
+            {confirmModal.isOpen && (
+                <div className="modal-overlay" style={{ zIndex: 1100 }}>
+                    <div className="modal-content" style={{ maxWidth: '400px', animation: 'fadeIn 200ms ease' }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">{confirmModal.title}</h2>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{confirmModal.message}</p>
+                        </div>
+                        <div className="modal-footer">
+                            <button type="button" className="btn btn-secondary" onClick={() => setConfirmModal({ isOpen: false, type: null, id: null, title: '', message: '' })}>
+                                Yo'q
+                            </button>
+                            <button type="button" className={`btn ${confirmModal.type === 'delete' ? 'btn-danger' : 'btn-primary'}`} onClick={executeConfirmAction}>
+                                Ha, tasdiqlayman
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
