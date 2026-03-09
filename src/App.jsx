@@ -11,6 +11,7 @@ import Inventory from './pages/Inventory';
 import Reports from './pages/Reports';
 import Staff from './pages/Staff';
 import Categories from './pages/Categories';
+import Requests from './pages/Requests';
 
 function App() {
     const [user, setUser] = useState(null);
@@ -73,6 +74,7 @@ function App() {
                 <Route path="/incoming" element={<Incoming token={token} />} />
                 <Route path="/outgoing" element={<Outgoing token={token} />} />
                 <Route path="/debts" element={<Debts token={token} />} />
+                <Route path="/requests" element={<Requests token={token} />} />
                 <Route path="/inventory" element={<Inventory token={token} />} />
                 <Route path="/reports" element={<Reports token={token} />} />
                 <Route path="/staff" element={<Staff token={token} />} />

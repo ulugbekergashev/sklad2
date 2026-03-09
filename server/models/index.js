@@ -96,6 +96,19 @@ export const InventoryItem = sequelize.define('InventoryItem', {
     notes: { type: DataTypes.TEXT },
 }, { tableName: 'inventory_items', timestamps: true });
 
+export const Request = sequelize.define('Request', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    client_name: { type: DataTypes.STRING, allowNull: false },
+    phone: { type: DataTypes.STRING },
+    product_id: { type: DataTypes.INTEGER, references: { model: 'products', key: 'id' } },
+    product_name: { type: DataTypes.STRING }, // erkin kiritish uchun
+    quantity: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
+    expected_date: { type: DataTypes.DATE },
+    status: { type: DataTypes.ENUM('pending', 'completed', 'cancelled'), defaultValue: 'pending' },
+    notes: { type: DataTypes.TEXT },
+    created_by: { type: DataTypes.INTEGER, references: { model: 'users', key: 'id' } },
+}, { tableName: 'requests', timestamps: true });
+
 // ========== RELATIONSHIPS ==========
 
 // Product <-> Category
@@ -137,5 +150,13 @@ InventoryItem.belongsTo(InventoryCheck, { foreignKey: 'check_id', as: 'check' })
 // InventoryItem <-> Product
 Product.hasMany(InventoryItem, { foreignKey: 'product_id', as: 'inventoryItems' });
 InventoryItem.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+
+// Request <-> User
+User.hasMany(Request, { foreignKey: 'created_by', as: 'requests' });
+Request.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+
+// Request <-> Product
+Product.hasMany(Request, { foreignKey: 'product_id', as: 'requests' });
+Request.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
 
 export default sequelize;

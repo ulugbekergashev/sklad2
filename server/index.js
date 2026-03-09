@@ -16,6 +16,7 @@ import reportRoutes from './routes/reports.js';
 import dashboardRoutes from './routes/dashboard.js';
 import aiRoutes from './routes/ai.js';
 import userRoutes from './routes/users.js';
+import requestRoutes from './routes/requests.js';
 import authMiddleware from './middleware/auth.js';
 import { initBot, getBot } from './telegram/bot.js';
 
@@ -40,6 +41,7 @@ app.use('/api/reports', authMiddleware, reportRoutes);
 app.use('/api/dashboard', authMiddleware, dashboardRoutes);
 app.use('/api/ai', authMiddleware, aiRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
+app.use('/api/requests', authMiddleware, requestRoutes);
 
 // Telegram Webhook endpoint (for Vercel)
 app.post('/api/telegram-webhook', async (req, res) => {

@@ -12,6 +12,7 @@ const navItems = [
     { path: '/incoming', icon: ArrowDownToLine, label: 'Kirim' },
     { path: '/outgoing', icon: ArrowUpFromLine, label: 'Chiqim' },
     { path: '/debts', icon: Landmark, label: 'Qarzlar' },
+    { path: '/requests', icon: Package, label: 'Buyurtmalar' },
     { path: '/inventory', icon: ClipboardList, label: 'Inventarizatsiya' },
     { path: '/reports', icon: FileBarChart, label: 'Hisobotlar' },
 ];
