@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Product, StockMovement, Debt } from '../models/index.js';
+import { Product, StockMovement, Debt, Request } from '../models/index.js';
 import sequelize from '../config/database.js';
 import { Op, fn, col, literal } from 'sequelize';
 
@@ -40,6 +40,24 @@ router.get('/stats', async (req, res) => {
             raw: true,
         });
 
+        // Bugungi savdo (Today's Sales - OUT)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const todaySales = await StockMovement.findOne({
+            where: {
+                movement_type: 'OUT',
+                createdAt: { [Op.gte]: today }
+            },
+            attributes: [[fn('SUM', col('total_amount')), 'today_sales']],
+            raw: true,
+        });
+
+        // Kutilayotgan Zayavkalar (Pending Requests)
+        const pendingRequests = await Request.count({
+            where: { status: 'pending' }
+        });
+
         // Last 30 days movements for chart
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -72,6 +90,39 @@ router.get('/stats', async (req, res) => {
         });
         const chartData = Object.values(chartDataMap);
 
+        // Top 5 sotilgan mahsulotlar (oxirgi 30 kun)
+        const topProductsData = await StockMovement.findAll({
+            where: {
+                movement_type: 'OUT',
+                createdAt: { [Op.gte]: thirtyDaysAgo }
+            },
+            attributes: ['product_id', [fn('SUM', col('quantity')), 'total_quantity']],
+            group: ['product_id'],
+            order: [[literal('total_quantity'), 'DESC']],
+            limit: 5,
+            raw: true,
+        });
+
+        let topProducts = [];
+        if (topProductsData.length > 0) {
+            const topProductIds = topProductsData.map(p => p.product_id);
+            const topProductsDetails = await Product.findAll({
+                where: { id: { [Op.in]: topProductIds } },
+                attributes: ['id', 'name', 'unit'],
+                raw: true,
+            });
+
+            topProducts = topProductsData.map(tp => {
+                const product = topProductsDetails.find(p => p.id === tp.product_id);
+                return {
+                    id: tp.product_id,
+                    name: product?.name || 'Noma\'lum mahsulot',
+                    unit: product?.unit || 'dona',
+                    total_quantity: parseFloat(tp.total_quantity)
+                };
+            });
+        }
+
         res.json({
             totalProducts,
             stockValue: parseFloat(stockValue?.total_value || 0),
@@ -79,6 +130,9 @@ router.get('/stats', async (req, res) => {
             lowStockProducts,
             totalReceivable: parseFloat(activeDebts?.total_receivable || 0),
             totalPayable: parseFloat(payableDebts?.total_payable || 0),
+            todaySales: parseFloat(todaySales?.today_sales || 0),
+            pendingRequests,
+            topProducts,
             chartData,
         });
     } catch (error) {

@@ -1,6 +1,7 @@
 import express from 'express';
 import { Op } from 'sequelize';
-import { Request, User, Product } from '../models/index.js';
+import sequelize from '../config/database.js';
+import { Request, User, Product, StockMovement } from '../models/index.js';
 
 const router = express.Router();
 
@@ -114,6 +115,7 @@ router.post('/', async (req, res) => {
 
 // Zayavkani yangilash (asosan status o'zgartirish uchun)
 router.put('/:id', async (req, res) => {
+    const t = await sequelize.transaction();
     try {
         const {
             client_name,
@@ -126,22 +128,98 @@ router.put('/:id', async (req, res) => {
             notes,
         } = req.body;
 
-        const request = await Request.findByPk(req.params.id);
+        const request = await Request.findByPk(req.params.id, { transaction: t });
 
         if (!request) {
+            await t.rollback();
             return res.status(404).json({ message: 'Zayavka topilmadi' });
         }
 
-        await request.update({
-            client_name: client_name !== undefined ? client_name : request.client_name,
-            phone: phone !== undefined ? phone : request.phone,
-            product_id: product_id !== undefined ? (product_id || null) : request.product_id,
-            product_name: product_name !== undefined ? product_name : request.product_name,
-            quantity: quantity !== undefined ? parseFloat(quantity) : request.quantity,
-            expected_date: expected_date !== undefined ? (expected_date ? new Date(expected_date) : null) : request.expected_date,
-            status: status !== undefined ? status : request.status,
-            notes: notes !== undefined ? notes : request.notes,
-        });
+        // Agar status 'completed' ga o'zgarayotgan bo'lsa va avval 'completed' bo'lmasa
+        if (status === 'completed' && request.status !== 'completed') {
+            let finalProductId = product_id !== undefined ? (product_id || null) : request.product_id;
+            const finalProductName = product_name !== undefined ? product_name : request.product_name;
+            const finalQuantity = quantity !== undefined ? parseFloat(quantity) : parseFloat(request.quantity);
+
+            // 1. Agar product_id yo'q bo'lsa, lekin product_name bor bo'lsa, yangi mahsulot yaratamiz
+            if (!finalProductId && finalProductName) {
+                // Avval shu nomli mahsulot bor-yo'qligini tekshiramiz
+                let existingProduct = await Product.findOne({
+                    where: sequelize.where(
+                        sequelize.fn('LOWER', sequelize.col('name')),
+                        sequelize.fn('LOWER', finalProductName)
+                    ),
+                    transaction: t
+                });
+
+                if (existingProduct) {
+                    finalProductId = existingProduct.id;
+                } else {
+                    // Yangi mahsulot yaratamiz
+                    const newProduct = await Product.create({
+                        name: finalProductName,
+                        sku: `ZRV-${Date.now().toString().slice(-6)}`, // Tasodifiy SKU
+                        category_id: null,
+                        unit: 'dona',
+                        price: 0,
+                        current_stock: 0,
+                        barcode: null,
+                        min_stock: 10,
+                    }, { transaction: t });
+                    finalProductId = newProduct.id;
+                }
+            }
+
+            // 2. StockMovement yaratamiz (Kirim - IN)
+            if (finalProductId && finalQuantity > 0) {
+                const product = await Product.findByPk(finalProductId, { transaction: t });
+                if (product) {
+                    await StockMovement.create({
+                        product_id: finalProductId,
+                        movement_type: 'IN',
+                        quantity: finalQuantity,
+                        unit_price: 0, // Bepul kirim (yoki zayavkadan narx olish mumkin kelajakda)
+                        total_amount: 0,
+                        paid_amount: 0,
+                        notes: `Zayavka asosida avtomatik kirim. Bajarildi.`,
+                        counterparty_name: client_name !== undefined ? client_name : request.client_name,
+                        created_by: req.user.id
+                    }, { transaction: t });
+
+                    // 3. Ombor qoldig'ini yangilaymiz
+                    await product.update({
+                        current_stock: parseFloat(product.current_stock) + finalQuantity
+                    }, { transaction: t });
+                }
+            }
+
+            // Request ni o'zini yangisiga moslab saqlash (product_id endi qo'shilgan)
+            await request.update({
+                client_name: client_name !== undefined ? client_name : request.client_name,
+                phone: phone !== undefined ? phone : request.phone,
+                product_id: finalProductId, // muhim: agar yangi yaratilgan bo'lsa
+                product_name: finalProductName,
+                quantity: finalQuantity,
+                expected_date: expected_date !== undefined ? (expected_date ? new Date(expected_date) : null) : request.expected_date,
+                status: status,
+                notes: notes !== undefined ? notes : request.notes,
+            }, { transaction: t });
+
+        } else {
+            // Oddiy o'zgartirish (Status 'completed' ga EMAS yoki allaqachon 'completed' bo'lgan bo'lsa)
+            await request.update({
+                client_name: client_name !== undefined ? client_name : request.client_name,
+                phone: phone !== undefined ? phone : request.phone,
+                product_id: product_id !== undefined ? (product_id || null) : request.product_id,
+                product_name: product_name !== undefined ? product_name : request.product_name,
+                quantity: quantity !== undefined ? parseFloat(quantity) : request.quantity,
+                expected_date: expected_date !== undefined ? (expected_date ? new Date(expected_date) : null) : request.expected_date,
+                status: status !== undefined ? status : request.status,
+                notes: notes !== undefined ? notes : request.notes,
+            }, { transaction: t });
+        }
+
+        await t.commit();
 
         const updatedRequest = await Request.findByPk(request.id, {
             include: [
@@ -152,6 +230,7 @@ router.put('/:id', async (req, res) => {
 
         res.json(updatedRequest);
     } catch (error) {
+        await t.rollback();
         console.error('Zayavkani yangilashda xatolik:', error);
         res.status(500).json({ message: 'Server xatosi', error: error.message });
     }
