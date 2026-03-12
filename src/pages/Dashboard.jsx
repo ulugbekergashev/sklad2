@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, DollarSign, AlertTriangle, Landmark, TrendingUp, TrendingDown, Clock, ShoppingCart, Star } from 'lucide-react';
+import { Package, DollarSign, AlertTriangle, Landmark, TrendingUp, TrendingDown, Clock, ShoppingCart, Star, ArrowUpRight, ArrowDownRight, Activity, FileText, CheckCircle, PlusCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Dashboard({ token }) {
@@ -97,6 +97,71 @@ export default function Dashboard({ token }) {
                     <div className="stat-info">
                         <div className="stat-label">Kutilayotgan Zayavkalar</div>
                         <div className="stat-value">{stats?.pendingRequests || 0}</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 1 Month Stats Section */}
+            <div className="page-header" style={{ marginTop: '32px' }}>
+                <div>
+                    <h2 className="page-title" style={{ fontSize: '1.25rem' }}>1 Oylik Ko'rsatkichlar (Oxirgi 30 kun)</h2>
+                </div>
+            </div>
+
+            <div className="stats-grid">
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e' }}><ArrowUpRight size={24} /></div>
+                    <div className="stat-info">
+                        <div className="stat-label">1 Oylik Savdo</div>
+                        <div className="stat-value" style={{ fontSize: '1.25rem' }}>
+                            {formatCurrency(stats?.monthlyRevenue)}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><ArrowDownRight size={24} /></div>
+                    <div className="stat-info">
+                        <div className="stat-label">1 Oylik Rasxod</div>
+                        <div className="stat-value" style={{ fontSize: '1.25rem' }}>
+                            {formatCurrency(stats?.monthlyExpense)}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8' }}><Activity size={24} /></div>
+                    <div className="stat-info">
+                        <div className="stat-label">1 Oylik Sof Foyda</div>
+                        <div className="stat-value" style={{ fontSize: '1.25rem' }}>
+                            {formatCurrency(stats?.monthlyNetProfit)}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}><FileText size={24} /></div>
+                    <div className="stat-info">
+                        <div className="stat-label">30 Kunda Zayavkalar</div>
+                        <div className="stat-value">{stats?.monthlyRequests || 0}</div>
+                    </div>
+                </div>
+
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: 'rgba(234, 179, 8, 0.1)', color: '#eab308' }}><CheckCircle size={24} /></div>
+                    <div className="stat-info">
+                        <div className="stat-label">1 Oyda Undirilgan Qarzlar</div>
+                        <div className="stat-value" style={{ fontSize: '1.25rem' }}>
+                            {formatCurrency(stats?.monthlyDebtCollected)}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#ec4899' }}><PlusCircle size={24} /></div>
+                    <div className="stat-info">
+                        <div className="stat-label">Yangi Mahsulotlar (1 Oy)</div>
+                        <div className="stat-value">{stats?.monthlyProductsAdded || 0}</div>
                     </div>
                 </div>
             </div>

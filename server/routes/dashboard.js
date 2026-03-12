@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Product, StockMovement, Debt, Request } from '../models/index.js';
+import { Product, StockMovement, Debt, Request, DebtPayment } from '../models/index.js';
 import sequelize from '../config/database.js';
 import { Op, fn, col, literal } from 'sequelize';
 
@@ -75,6 +75,45 @@ router.get('/stats', async (req, res) => {
             raw: true,
         });
 
+        // 1-month revenue
+        const monthlyRevenue = await StockMovement.findOne({
+            where: {
+                movement_type: 'OUT',
+                createdAt: { [Op.gte]: thirtyDaysAgo }
+            },
+            attributes: [[fn('SUM', col('total_amount')), 'monthly_revenue']],
+            raw: true,
+        });
+
+        // 1-month expense
+        const monthlyExpense = await StockMovement.findOne({
+            where: {
+                movement_type: 'IN',
+                createdAt: { [Op.gte]: thirtyDaysAgo }
+            },
+            attributes: [[fn('SUM', col('total_amount')), 'monthly_expense']],
+            raw: true,
+        });
+
+        const monthlyNetProfit = (parseFloat(monthlyRevenue?.monthly_revenue || 0) - parseFloat(monthlyExpense?.monthly_expense || 0));
+
+        // 1-month requests
+        const monthlyRequests = await Request.count({
+            where: { createdAt: { [Op.gte]: thirtyDaysAgo } }
+        });
+
+        // 1-month debt collected
+        const monthlyDebtCollected = await DebtPayment.findOne({
+            where: { createdAt: { [Op.gte]: thirtyDaysAgo } },
+            attributes: [[fn('SUM', col('amount')), 'monthly_debt_collected']],
+            raw: true,
+        });
+
+        // 1-month products added
+        const monthlyProductsAdded = await Product.count({
+            where: { createdAt: { [Op.gte]: thirtyDaysAgo } }
+        });
+
         // Format chart data
         const chartDataMap = {};
         movements.forEach(m => {
@@ -134,6 +173,12 @@ router.get('/stats', async (req, res) => {
             pendingRequests,
             topProducts,
             chartData,
+            monthlyRevenue: parseFloat(monthlyRevenue?.monthly_revenue || 0),
+            monthlyExpense: parseFloat(monthlyExpense?.monthly_expense || 0),
+            monthlyNetProfit,
+            monthlyRequests,
+            monthlyDebtCollected: parseFloat(monthlyDebtCollected?.monthly_debt_collected || 0),
+            monthlyProductsAdded,
         });
     } catch (error) {
         console.error('Dashboard stats error:', error);
