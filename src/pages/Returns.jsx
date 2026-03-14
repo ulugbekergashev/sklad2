@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ArrowUpFromLine, Check, AlertCircle, Plus, X, Package } from 'lucide-react';
+import { RotateCcw, Check, AlertCircle, Plus, X, Package } from 'lucide-react';
 
-export default function Outgoing({ token }) {
+export default function Returns({ token }) {
     const [movements, setMovements] = useState([]);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -18,7 +18,7 @@ export default function Outgoing({ token }) {
     const fetchAll = async () => {
         try {
             const [movRes, prodRes] = await Promise.all([
-                fetch('/api/movements?type=OUT', { headers }),
+                fetch('/api/movements?type=RETURN', { headers }),
                 fetch('/api/products', { headers }),
             ]);
             setMovements(await movRes.json());
@@ -34,7 +34,6 @@ export default function Outgoing({ token }) {
 
     const selectedProduct = products.find(p => p.id === parseInt(form.product_id));
     const total = (parseFloat(form.quantity || 0) * parseFloat(form.unit_price || 0));
-    const debtAmount = Math.max(0, total - parseFloat(form.paid_amount || 0));
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -44,11 +43,11 @@ export default function Outgoing({ token }) {
         try {
             const res = await fetch('/api/movements', {
                 method: 'POST', headers,
-                body: JSON.stringify({ ...form, movement_type: 'OUT' }),
+                body: JSON.stringify({ ...form, movement_type: 'RETURN' }),
             });
             const data = await res.json();
             if (res.ok) {
-                setResult({ success: true, message: 'Chiqim muvaffaqiyatli amalga oshirildi!', debt: data.debt });
+                setResult({ success: true, message: 'Vozvrat muvaffaqiyatli amalga oshirildi!' });
                 setForm({ product_id: '', quantity: '', unit_price: '', paid_amount: '', counterparty_name: '', counterparty_phone: '', notes: '' });
                 setShowForm(false);
                 fetchAll();
@@ -70,11 +69,11 @@ export default function Outgoing({ token }) {
         <div>
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Chiqim</h1>
-                    <p className="page-subtitle">Jami: {movements.length} ta chiqim</p>
+                    <h1 className="page-title">Vozvrat</h1>
+                    <p className="page-subtitle">Jami: {movements.length} ta vozvrat</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => { setShowForm(true); setResult(null); }}>
-                    <Plus size={18} /> Chiqim qo'shish
+                    <Plus size={18} /> Vozvrat qo'shish
                 </button>
             </div>
 
@@ -91,11 +90,6 @@ export default function Outgoing({ token }) {
                             <div style={{ fontWeight: 600, color: result.success ? 'var(--success)' : 'var(--danger)' }}>
                                 {result.message}
                             </div>
-                            {result.debt && (
-                                <div style={{ fontSize: '0.85rem', color: 'var(--info)', marginTop: '4px' }}>
-                                    💰 {result.debt.counterparty_name} dan {formatPrice(result.debt.remaining_amount)} so'm qarz yozildi
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -112,7 +106,7 @@ export default function Outgoing({ token }) {
                             <th>Miqdor</th>
                             <th>Narxi</th>
                             <th>Jami</th>
-                            <th>To'langan</th>
+                            <th>Qaytarilgan pul</th>
                             <th>Mijoz</th>
                             <th>Izoh</th>
                         </tr>
@@ -121,9 +115,9 @@ export default function Outgoing({ token }) {
                         {movements.length === 0 ? (
                             <tr><td colSpan={9}>
                                 <div className="empty-state">
-                                    <ArrowUpFromLine size={48} />
-                                    <h3>Chiqim tarixi bo'sh</h3>
-                                    <p>"Chiqim qo'shish" tugmasini bosib yangi chiqim yarating</p>
+                                    <RotateCcw size={48} />
+                                    <h3>Vozvrat tarixi bo'sh</h3>
+                                    <p>"Vozvrat qo'shish" tugmasini bosib yangi vozvrat yarating</p>
                                 </div>
                             </td></tr>
                         ) : movements.map((m, i) => (
@@ -138,7 +132,7 @@ export default function Outgoing({ token }) {
                                 <td>{parseFloat(m.quantity)} {m.product?.unit || ''}</td>
                                 <td>{formatPrice(m.unit_price)} so'm</td>
                                 <td style={{ fontWeight: 600 }}>{formatPrice(m.total_amount)} so'm</td>
-                                <td style={{ color: parseFloat(m.paid_amount) < parseFloat(m.total_amount) ? 'var(--warning)' : 'var(--success)' }}>
+                                <td style={{ color: 'var(--warning)' }}>
                                     {formatPrice(m.paid_amount)} so'm
                                 </td>
                                 <td>{m.counterparty_name || '-'}</td>
@@ -149,26 +143,14 @@ export default function Outgoing({ token }) {
                         ))}
                     </tbody>
                 </table>
-
-                {/* Summary */}
-                {movements.length > 0 && (
-                    <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '32px', fontSize: '0.875rem' }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>
-                            Jami: <strong style={{ color: 'var(--text-primary)' }}>{movements.length}</strong> ta chiqim
-                        </span>
-                        <span style={{ color: 'var(--danger)' }}>
-                            Summa: <strong>{formatPrice(movements.reduce((s, m) => s + parseFloat(m.total_amount || 0), 0))}</strong> so'm
-                        </span>
-                    </div>
-                )}
             </div>
 
-            {/* Add Outgoing Modal */}
+            {/* Add Return Modal */}
             {showForm && (
                 <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowForm(false)}>
                     <div className="modal-content" style={{ maxWidth: '600px' }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">Yangi chiqim</h2>
+                            <h2 className="modal-title">Yangi vozvrat</h2>
                             <button className="modal-close" onClick={() => setShowForm(false)}><X size={20} /></button>
                         </div>
                         <form onSubmit={handleSubmit}>
@@ -183,12 +165,6 @@ export default function Outgoing({ token }) {
                                     </select>
                                 </div>
 
-                                {selectedProduct && (
-                                    <div style={{ background: 'rgba(59,130,246,0.08)', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.875rem', color: 'var(--info)' }}>
-                                        Omborda: <strong>{parseFloat(selectedProduct.current_stock)} {selectedProduct.unit}</strong>
-                                    </div>
-                                )}
-
                                 <div className="form-row">
                                     <div className="form-group">
                                         <label className="form-label">Miqdori *</label>
@@ -202,19 +178,16 @@ export default function Outgoing({ token }) {
 
                                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '10px', marginBottom: '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                                        <span style={{ color: 'var(--text-secondary)' }}>Jami summa:</span>
+                                        <span style={{ color: 'var(--text-secondary)' }}>Jami vozvrat summa:</span>
                                         <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>{formatPrice(total)} so'm</span>
                                     </div>
-                                    <div className="form-group" style={{ marginBottom: '12px' }}>
-                                        <label className="form-label">To'langan summa</label>
+                                    <div className="form-group">
+                                        <label className="form-label">Qaytarilgan naqd pul (mijozga berilgan bo'lsa)</label>
                                         <input className="form-input" type="number" step="any" placeholder="0" value={form.paid_amount} onChange={e => setForm({ ...form, paid_amount: e.target.value })} />
                                     </div>
-                                    {debtAmount > 0 && (
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--warning)', fontWeight: 600 }}>
-                                            <span>Qarz (bizga berilishi kerak):</span>
-                                            <span>{formatPrice(debtAmount)} so'm</span>
-                                        </div>
-                                    )}
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+                                        Eslatma: Mahsulot omborga qaytadi va zaxira ko'payadi.
+                                    </p>
                                 </div>
 
                                 <div className="form-row">
@@ -230,14 +203,14 @@ export default function Outgoing({ token }) {
 
                                 <div className="form-group">
                                     <label className="form-label">Izoh</label>
-                                    <textarea className="form-textarea" placeholder="Qo'shimcha izoh..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+                                    <textarea className="form-textarea" placeholder="Nima sababdan qaytdi?..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
                                 </div>
                             </div>
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Bekor qilish</button>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    <ArrowUpFromLine size={16} />
-                                    {saving ? 'Saqlanmoqda...' : 'Chiqim qilish'}
+                                    <RotateCcw size={16} />
+                                    {saving ? 'Saqlanmoqda...' : 'Vozvrat qilish'}
                                 </button>
                             </div>
                         </form>

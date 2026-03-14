@@ -11,7 +11,7 @@ import sequelize from '../config/database.js';
 export async function executeAction(aiResponse, originalMessage, userId = 1) {
     let result = { ...aiResponse };
 
-    if (aiResponse.action === 'incoming' || aiResponse.action === 'outgoing') {
+    if (aiResponse.action === 'incoming' || aiResponse.action === 'outgoing' || aiResponse.action === 'return') {
         const product = await Product.findOne({
             where: sequelize.where(
                 sequelize.fn('LOWER', sequelize.col('name')),
@@ -27,7 +27,10 @@ export async function executeAction(aiResponse, originalMessage, userId = 1) {
         const unitPrice = parseFloat(aiResponse.unit_price || product.price || 0);
         const totalAmount = qty * unitPrice;
         const paidAmount = parseFloat(aiResponse.paid_amount ?? totalAmount);
-        const movementType = aiResponse.action === 'incoming' ? 'IN' : 'OUT';
+        let movementType;
+        if (aiResponse.action === 'incoming') movementType = 'IN';
+        else if (aiResponse.action === 'return') movementType = 'RETURN';
+        else movementType = 'OUT';
 
         if (movementType === 'OUT' && qty > parseFloat(product.current_stock)) {
             return {
@@ -50,7 +53,7 @@ export async function executeAction(aiResponse, originalMessage, userId = 1) {
                 created_by: userId,
             }, { transaction: t });
 
-            const newStock = movementType === 'IN'
+            const newStock = (movementType === 'IN' || movementType === 'RETURN')
                 ? parseFloat(product.current_stock) + qty
                 : parseFloat(product.current_stock) - qty;
             await product.update({ current_stock: newStock }, { transaction: t });
@@ -59,13 +62,13 @@ export async function executeAction(aiResponse, originalMessage, userId = 1) {
                 const debtAmount = totalAmount - paidAmount;
                 await Debt.create({
                     movement_id: movement.id,
-                    debt_type: movementType === 'IN' ? 'payable' : 'receivable',
+                    debt_type: movementType === 'IN' ? 'payable' : (movementType === 'RETURN' ? 'payable' : 'receivable'),
                     counterparty_name: aiResponse.counterparty_name || 'Noma\'lum',
                     total_amount: debtAmount,
                     paid_amount: 0,
                     remaining_amount: debtAmount,
                     status: 'active',
-                    description: `Telegram: ${product.name} ${qty} ${product.unit}`,
+                    description: `Telegram ${movementType === 'RETURN' ? 'Vozvrat' : ''}: ${product.name} ${qty} ${product.unit}`,
                     created_by: userId,
                 }, { transaction: t });
 
@@ -228,7 +231,7 @@ export function buildConfirmationMessage(aiResponse) {
         const paid = parseFloat(aiResponse.paid_amount ?? total);
         const debt = Math.max(0, total - paid);
 
-        let msg = `📤 *Chiqim qilish*\n\n`;
+        let msg = `📤 *Sotuv qilish*\n\n`;
         msg += `📦 Mahsulot: *${aiResponse.product_name}*\n`;
         msg += `📏 Miqdor: *${qty}*\n`;
         msg += `💰 Narxi: *${fmt(price)}* so'm\n`;
@@ -267,6 +270,23 @@ export function buildConfirmationMessage(aiResponse) {
         msg += `📏 Miqdor: *${aiResponse.quantity || 0}*\n`;
         if (aiResponse.expected_date) msg += `📅 Sana: *${aiResponse.expected_date}*\n`;
         msg += `\n*Shuni saqlashni xohlaysizmi?*`;
+        return msg;
+    }
+
+    if (aiResponse.action === 'return') {
+        const qty = parseFloat(aiResponse.quantity || 0);
+        const price = parseFloat(aiResponse.unit_price || 0);
+        const total = qty * price;
+        const paid = parseFloat(aiResponse.paid_amount ?? 0);
+
+        let msg = `🔄 *Vozvrat qilish*\n\n`;
+        msg += `📦 Mahsulot: *${aiResponse.product_name}*\n`;
+        msg += `📏 Miqdor: *${qty}*\n`;
+        msg += `💰 Narxi: *${fmt(price)}* so'm\n`;
+        msg += `💵 Jami summa: *${fmt(total)}* so'm\n`;
+        if (aiResponse.counterparty_name) msg += `👤 Kimdan: *${aiResponse.counterparty_name}*\n`;
+        if (paid > 0) msg += `💳 Qaytarilgan pul: *${fmt(paid)}* so'm\n`;
+        msg += `\n*Shuni bajarishni xohlaysizmi?*`;
         return msg;
     }
 

@@ -48,7 +48,7 @@ ${debtContext || 'Aktiv qarz yo\'q'}
 
 SEN FAQAT JSON FORMATDA JAVOB BERISHING KERAK:
 {
-  "action": "info" | "incoming" | "outgoing" | "payment" | "add_product",
+  "action": "info" | "incoming" | "outgoing" | "payment" | "add_product" | "return",
   "message": "Foydalanuvchiga xabar (o'zbek tilida)",
   ...qo'shimcha maydonlar
 }
@@ -56,10 +56,11 @@ SEN FAQAT JSON FORMATDA JAVOB BERISHING KERAK:
 ACTION TURLARI:
 1. "info" — oddiy ma'lumot berish: {"action": "info", "message": "javob"}
 2. "incoming" — kirim: {"action": "incoming", "product_name": "nomi", "quantity": 10, "unit_price": 5000, "paid_amount": 50000, "counterparty_name": "yetkazib beruvchi", "message": "..."}
-3. "outgoing" — chiqim: {"action": "outgoing", "product_name": "nomi", "quantity": 5, "unit_price": 10000, "paid_amount": 0, "counterparty_name": "mijoz", "message": "..."}
+3. "outgoing" — sotuv: {"action": "outgoing", "product_name": "nomi", "quantity": 5, "unit_price": 10000, "paid_amount": 0, "counterparty_name": "mijoz", "message": "..."}
 4. "payment" — qarz to'lash: {"action": "payment", "counterparty_name": "ism", "amount": 50000, "message": "..."}
 5. "add_product" — yangi mahsulot: {"action": "add_product", "name": "nomi", "sku": "SKU001", "unit": "dona", "price": 5000, "initial_stock": 100, "message": "..."}
 6. "request" — zayavka (buyurtma) olish: {"action": "request", "client_name": "ism", "product_name": "mahsulot", "quantity": 10, "expected_date": "2024-03-20", "message": "..."}
+7. "return" — vozvrat (mahsulot qaytishi): {"action": "return", "product_name": "nomi", "quantity": 5, "unit_price": 10000, "paid_amount": 10000, "counterparty_name": "mijoz", "message": "..."}
 
 MUHIM: Har doim JSON formatda javob ber. O'zbek tilida javob yoz.`;
 
@@ -182,22 +183,27 @@ export function initBot(app) {
     const isWebhook = !!process.env.VERCEL;
 
     if (!botInstance) {
-        if (isWebhook) {
-            botInstance = new TelegramBot(token); // Polling o'chirilgan
+        try {
+            if (isWebhook) {
+                botInstance = new TelegramBot(token); // Polling o'chirilgan
 
-            // Webhook o'rnatish
-            const domain = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
-            if (domain) {
-                const url = `https://${domain}/api/telegram-webhook`;
-                botInstance.setWebHook(url).then(() => {
-                    console.log(`🤖 Telegram Webhook o'rnatildi: ${url}`);
-                }).catch(err => console.error('Webhook error:', err));
+                // Webhook o'rnatish
+                const domain = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+                if (domain) {
+                    const url = `https://${domain}/api/telegram-webhook`;
+                    botInstance.setWebHook(url).then(() => {
+                        console.log(`🤖 Telegram Webhook o'rnatildi: ${url}`);
+                    }).catch(err => console.error('Webhook error:', err));
+                } else {
+                    console.log('⚠️ Vercel domeni topilmadi, webhook o\'rnatilmadi.');
+                }
             } else {
-                console.log('⚠️ Vercel domeni topilmadi, webhook o\'rnatilmadi.');
+                botInstance = new TelegramBot(token, { polling: true });
+                console.log('🤖 Telegram bot ishga tushdi (Polling)');
             }
-        } else {
-            botInstance = new TelegramBot(token, { polling: true });
-            console.log('🤖 Telegram bot ishga tushdi (Polling)');
+        } catch (err) {
+            console.error('❌ Bot init error:', err);
+            return null;
         }
     }
 
@@ -527,7 +533,8 @@ export function initBot(app) {
             `• _"Alining qarzidan 100 ming to'landi"_\n` +
             `• _"Yangi mahsulot: Sabzi, narxi 3000, 50 kg"_\n` +
             `• _"Omborda nima bor?"_\n` +
-            `• _"Kimda qarz bor?"_`,
+            `• _"Kimda qarz bor?"_\n` +
+            `• _"5 ta olma vozvrat bo'ldi, pulini qaytardim"_`,
             { parse_mode: 'Markdown' }
         );
     });

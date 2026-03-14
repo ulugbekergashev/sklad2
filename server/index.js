@@ -71,7 +71,6 @@ const initServer = async () => {
         await sequelize.authenticate();
         console.log('✅ Database ulanishi muvaffaqiyatli');
 
-        // Vercel serverless muhitida alter: true qilmaymiz, ortiqcha yuk.
         if (!process.env.VERCEL) {
             await sequelize.sync({ alter: true });
             console.log('✅ Database jadvallari sinxronlashtirildi');

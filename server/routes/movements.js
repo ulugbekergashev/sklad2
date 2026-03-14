@@ -40,7 +40,8 @@ router.post('/', async (req, res) => {
     try {
         const {
             product_id, movement_type, quantity, unit_price,
-            paid_amount, notes, supplier_id, counterparty_name, counterparty_phone
+            paid_amount, notes, supplier_id, counterparty_name, counterparty_phone,
+            payment_method
         } = req.body;
 
         if (!product_id || !movement_type || !quantity) {
@@ -78,15 +79,19 @@ router.post('/', async (req, res) => {
             total_amount: totalAmount,
             paid_amount: paidAmt,
             notes,
+            payment_method,
             supplier_id: supplier_id || null,
             counterparty_name,
             created_by: req.user?.id || 1,
         }, { transaction: t });
 
         // Update product stock
-        const newStock = movement_type === 'IN'
-            ? parseFloat(product.current_stock) + qty
-            : parseFloat(product.current_stock) - qty;
+        let newStock;
+        if (movement_type === 'IN' || movement_type === 'RETURN') {
+            newStock = parseFloat(product.current_stock) + qty;
+        } else {
+            newStock = parseFloat(product.current_stock) - qty;
+        }
         await product.update({ current_stock: newStock }, { transaction: t });
 
         // Auto-create debt if paid_amount < total_amount
@@ -95,14 +100,14 @@ router.post('/', async (req, res) => {
             const debtAmount = totalAmount - paidAmt;
             debt = await Debt.create({
                 movement_id: movement.id,
-                debt_type: movement_type === 'IN' ? 'payable' : 'receivable',
+                debt_type: movement_type === 'IN' ? 'payable' : (movement_type === 'RETURN' ? 'payable' : 'receivable'),
                 counterparty_name: counterparty_name || (movement_type === 'IN' ? 'Yetkazib beruvchi' : 'Mijoz'),
                 counterparty_phone: counterparty_phone || null,
                 total_amount: debtAmount,
                 paid_amount: 0,
                 remaining_amount: debtAmount,
                 status: 'active',
-                description: `${product.name} - ${qty} ${product.unit} ${movement_type === 'IN' ? 'kirim' : 'chiqim'}`,
+                description: `${product.name} - ${qty} ${product.unit} ${movement_type === 'IN' ? 'kirim' : (movement_type === 'RETURN' ? 'vozvrat' : 'sotuv')}`,
                 created_by: req.user?.id || 1,
             }, { transaction: t });
         }
