@@ -38,7 +38,7 @@ export default function Dashboard({ token }) {
     };
 
     const formatCurrency = (val) => {
-        return new Intl.NumberFormat('uz-UZ').format(val || 0) + ' so\'m';
+        return new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 0 }).format(val || 0) + ' so\'m';
     };
 
     if (loading && !stats) {

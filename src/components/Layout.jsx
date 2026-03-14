@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-    LayoutDashboard, Package, ArrowDownToLine, ArrowUpFromLine,
-    Landmark, ClipboardList, FileBarChart, LogOut, Warehouse, Users, Tag, Menu, X
+    LayoutDashboard, Package, ArrowDownToLine, ShoppingCart,
+    Landmark, ClipboardList, FileBarChart, LogOut, Warehouse, Users, Tag, Menu, X, RotateCcw, Search, Loader2
 } from 'lucide-react';
 import AIChat from './AIChat';
 
@@ -10,10 +10,11 @@ const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/products', icon: Package, label: 'Mahsulotlar' },
     { path: '/incoming', icon: ArrowDownToLine, label: 'Kirim' },
-    { path: '/outgoing', icon: ArrowUpFromLine, label: 'Chiqim' },
+    { path: '/sales', icon: ShoppingCart, label: 'Sotuv' },
     { path: '/debts', icon: Landmark, label: 'Qarzlar' },
     { path: '/requests', icon: Package, label: 'Zayavkalar' },
     { path: '/inventory', icon: ClipboardList, label: 'Inventarizatsiya' },
+    { path: '/returns', icon: RotateCcw, label: 'Vozvrat' },
     { path: '/reports', icon: FileBarChart, label: 'Hisobotlar' },
 ];
 
@@ -24,20 +25,70 @@ const settingsItems = [
 
 export default function Layout({ children, user, onLogout }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [showResults, setShowResults] = useState(false);
+    
     const location = useLocation();
+    const navigate = useNavigate();
     const token = localStorage.getItem('sklad_token');
 
-    // Sahifa o'zgarganda sidebar'ni yopish
+    // Debounced search
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            setSearchResults([]);
+            return;
+        }
+
+        const delayDebounceFn = setTimeout(async () => {
+            setIsSearching(true);
+            try {
+                const res = await fetch(`/api/products?search=${encodeURIComponent(searchQuery)}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                setSearchResults(data);
+                setShowResults(true);
+            } catch (err) {
+                console.error('Search error:', err);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery, token]);
+
+    // Cleanup on navigation
     useEffect(() => {
         setSidebarOpen(false);
+        setShowResults(false);
     }, [location.pathname]);
 
-    // ESC tugmasi bilan yopish
+    // Keyboard shortcuts
     useEffect(() => {
-        const handleEsc = (e) => e.key === 'Escape' && setSidebarOpen(false);
-        window.addEventListener('keydown', handleEsc);
-        return () => window.removeEventListener('keydown', handleEsc);
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                setSidebarOpen(false);
+                setShowResults(false);
+            }
+            if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                document.getElementById('global-search')?.focus();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
+
+    const formatPrice = (val) => new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 0 }).format(val || 0);
+
+    const handleResultClick = (product) => {
+        setShowResults(false);
+        setSearchQuery('');
+        navigate(`/products?search=${encodeURIComponent(product.sku)}`);
+    };
 
     return (
         <div className="app-layout">
@@ -107,6 +158,59 @@ export default function Layout({ children, user, onLogout }) {
             </aside>
 
             <main className="main-content">
+                <header className="app-header">
+                    <div className="global-search-container">
+                        <div className="global-search-wrapper">
+                            <Search size={18} className="text-muted" />
+                            <input
+                                id="global-search"
+                                type="text"
+                                className="global-search-input"
+                                placeholder="Mahsulot yoki SKU bo'yicha qidirish..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onFocus={() => searchQuery.trim() && setShowResults(true)}
+                            />
+                            {isSearching ? <Loader2 size={16} className="spinner" /> : <div className="global-search-shortcut">/</div>}
+                        </div>
+
+                        {showResults && (
+                            <>
+                                <div className="sidebar-backdrop show" style={{ zIndex: 99, background: 'transparent' }} onClick={() => setShowResults(false)} />
+                                <div className="search-results-dropdown">
+                                    {searchResults.length === 0 ? (
+                                        <div className="search-no-results">Natija topilmadi</div>
+                                    ) : (
+                                        searchResults.map(p => (
+                                            <div key={p.id} className="search-result-item" onClick={() => handleResultClick(p)}>
+                                                <div className="search-result-image">
+                                                    <Package size={20} />
+                                                </div>
+                                                <div className="search-result-info">
+                                                    <div className="search-result-name">{p.name}</div>
+                                                    <div className="search-result-meta">
+                                                        <span>SKU: {p.sku}</span>
+                                                        <span>•</span>
+                                                        <span className="search-result-price">{formatPrice(p.price)} so'm</span>
+                                                        <span>•</span>
+                                                        <span className={parseFloat(p.current_stock) <= parseFloat(p.min_stock) ? 'low-stock' : ''}>
+                                                            {parseFloat(p.current_stock)} {p.unit}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {/* Any header actions could go here */}
+                    </div>
+                </header>
+
                 <div className="page-container">
                     {children}
                 </div>

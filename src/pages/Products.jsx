@@ -1,10 +1,18 @@
-import { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Trash2, Package, X } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Package, X, ArrowDownToLine, ShoppingCart, RotateCcw } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export default function Products({ token }) {
+    const location = useLocation();
+    const navigate = useNavigate();
+    
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
-    const [search, setSearch] = useState('');
+    
+    // URL search params dan qidiruvni olish
+    const queryParams = new URLSearchParams(location.search);
+    const initialSearch = queryParams.get('search') || '';
+    
+    const [search, setSearch] = useState(initialSearch);
     const [categoryFilter, setCategoryFilter] = useState('');
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -94,7 +102,7 @@ export default function Products({ token }) {
         }
     };
 
-    const formatPrice = (val) => new Intl.NumberFormat('uz-UZ').format(val || 0);
+    const formatPrice = (val) => new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 0 }).format(val || 0);
 
     if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
 
@@ -168,12 +176,18 @@ export default function Products({ token }) {
                                     </td>
                                     <td>{formatPrice(p.price)} so'm</td>
                                     <td className={isLow ? 'low-stock' : ''}>
-                                        {parseFloat(p.current_stock)} {p.unit}
+                                        {Math.round(parseFloat(p.current_stock))} {p.unit}
                                     </td>
-                                    <td>{parseFloat(p.min_stock)} {p.unit}</td>
+                                    <td>{Math.round(parseFloat(p.min_stock))} {p.unit}</td>
                                     <td>{p.location || '-'}</td>
                                     <td>
                                         <div style={{ display: 'flex', gap: '4px' }}>
+                                            <button className="btn-icon" onClick={() => navigate(`/incoming?product_id=${p.id}`)} title="Kirim qilish" style={{ color: 'var(--success)' }}>
+                                                <ArrowDownToLine size={16} />
+                                            </button>
+                                            <button className="btn-icon" onClick={() => navigate(`/sales?product_id=${p.id}`)} title="Sotish" style={{ color: 'var(--warning)' }}>
+                                                <ShoppingCart size={16} />
+                                            </button>
                                             <button className="btn-icon" onClick={() => openEdit(p)} title="Tahrirlash"><Edit2 size={16} /></button>
                                             <button className="btn-icon" onClick={() => handleDelete(p.id)} title="O'chirish" style={{ color: 'var(--danger)' }}>
                                                 <Trash2 size={16} />

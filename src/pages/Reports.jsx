@@ -60,14 +60,14 @@ export default function Reports({ token }) {
         setFilters(prev => ({ ...prev, from, to }));
     };
 
-    const formatPrice = (val) => new Intl.NumberFormat('uz-UZ').format(val || 0);
+    const formatPrice = (val) => new Intl.NumberFormat('uz-UZ', { maximumFractionDigits: 0 }).format(val || 0);
 
     return (
         <div>
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Hisobotlar</h1>
-                    <p className="page-subtitle">Kirim-chiqim tarixi va hisobotlar</p>
+                    <p className="page-subtitle">Kirim-sotuv tarixi va hisobotlar</p>
                 </div>
                 <button className="btn btn-primary" onClick={exportExcel}>
                     <Download size={18} /> Excel yuklab olish
@@ -91,7 +91,8 @@ export default function Reports({ token }) {
                             <select className="form-select" value={filters.type} onChange={e => setFilters({ ...filters, type: e.target.value })}>
                                 <option value="">Barchasi</option>
                                 <option value="IN">Kirim</option>
-                                <option value="OUT">Chiqim</option>
+                                <option value="OUT">Sotuv</option>
+                                <option value="RETURN">Vozvrat</option>
                             </select>
                         </div>
                         <button type="submit" className="btn btn-secondary">
@@ -148,8 +149,8 @@ export default function Reports({ token }) {
                                         {m.product?.name || '-'}
                                     </td>
                                     <td>
-                                        <span className={`badge ${m.movement_type === 'IN' ? 'badge-success' : 'badge-danger'}`}>
-                                            {m.movement_type === 'IN' ? 'Kirim' : 'Chiqim'}
+                                        <span className={`badge ${m.movement_type === 'IN' ? 'badge-success' : (m.movement_type === 'RETURN' ? 'badge-info' : 'badge-danger')}`}>
+                                            {m.movement_type === 'IN' ? 'Kirim' : (m.movement_type === 'RETURN' ? 'Vozvrat' : 'Sotuv')}
                                         </span>
                                     </td>
                                     <td>{parseFloat(m.quantity)} {m.product?.unit}</td>
@@ -173,7 +174,10 @@ export default function Reports({ token }) {
                                 Kirim: <strong>{formatPrice(movements.filter(m => m.movement_type === 'IN').reduce((s, m) => s + parseFloat(m.total_amount), 0))}</strong> so'm
                             </span>
                             <span style={{ color: 'var(--danger)' }}>
-                                Chiqim: <strong>{formatPrice(movements.filter(m => m.movement_type === 'OUT').reduce((s, m) => s + parseFloat(m.total_amount), 0))}</strong> so'm
+                                Sotuv: <strong>{formatPrice(movements.filter(m => m.movement_type === 'OUT').reduce((s, m) => s + parseFloat(m.total_amount), 0))}</strong> so'm
+                            </span>
+                            <span style={{ color: 'var(--info)' }}>
+                                Vozvrat: <strong>{formatPrice(movements.filter(m => m.movement_type === 'RETURN').reduce((s, m) => s + parseFloat(m.total_amount), 0))}</strong> so'm
                             </span>
                         </div>
                     )}
