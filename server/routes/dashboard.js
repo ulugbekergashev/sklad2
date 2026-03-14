@@ -8,7 +8,36 @@ const router = Router();
 // GET /api/dashboard/stats
 router.get('/stats', async (req, res) => {
     try {
-        // Total products count
+        const { startDate: qStart, endDate: qEnd } = req.query;
+        console.log('Dashboard stats requested with:', { qStart, qEnd });
+
+        let startDate = null;
+        let endDate = null;
+        const now = new Date();
+        
+        if (qStart && qEnd) {
+            startDate = new Date(qStart);
+            endDate = new Date(qEnd);
+            endDate.setHours(23, 59, 59, 999);
+        } else {
+            // Default to last 30 days
+            startDate = new Date(now.setDate(now.getDate() - 30));
+        }
+        
+        console.log('Final range:', { startDate, endDate });
+
+        const whereWithDates = (baseWhere = {}) => {
+            if (qStart && qEnd) {
+                // Fronteddan kelayotgan '2026-03-13' formatini to'g'ri qabul qilish
+                const start = new Date(qStart + 'T00:00:00Z');
+                const end = new Date(qEnd + 'T23:59:59Z');
+                
+                return { ...baseWhere, createdAt: { [Op.gte]: start, [Op.lte]: end } };
+            }
+            return baseWhere;
+        };
+
+        // 1. Absolute Stats (Current state - regardless of period)
         const totalProducts = await Product.count();
 
         // Total stock value
@@ -40,78 +69,71 @@ router.get('/stats', async (req, res) => {
             raw: true,
         });
 
-        // Bugungi savdo (Today's Sales - OUT)
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // Bugungi savdo (Today's Sales - OUT) - Always show today's
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
 
-        const todaySales = await StockMovement.findOne({
+        const todaySalesValue = await StockMovement.findOne({
             where: {
                 movement_type: 'OUT',
-                createdAt: { [Op.gte]: today }
+                createdAt: { [Op.gte]: todayStart }
             },
             attributes: [[fn('SUM', col('total_amount')), 'today_sales']],
             raw: true,
         });
 
-        // Kutilayotgan Zayavkalar (Pending Requests)
+        // 2. Periodical Stats (Based on selected period)
+        
+        // Revenue (OUT)
+        const revenue = await StockMovement.sum('total_amount', {
+            where: whereWithDates({ movement_type: 'OUT' })
+        }) || 0;
+
+        // Expense (IN)
+        const expense = await StockMovement.sum('total_amount', {
+            where: whereWithDates({ movement_type: 'IN' })
+        }) || 0;
+
+        const netProfit = (parseFloat(revenue) - parseFloat(expense));
+
+        // Requests in period
+        const periodicalRequests = await Request.count({
+            where: whereWithDates({})
+        });
+
+        // Debt collected in period
+        const periodicalDebtCollected = await DebtPayment.sum('amount', {
+            where: whereWithDates({})
+        }) || 0;
+
+        // Products added in period
+        const periodicalProductsAdded = await Product.count({
+            where: whereWithDates({})
+        });
+
+        // Returns in period
+        const periodicalReturns = await StockMovement.count({
+            where: whereWithDates({ movement_type: 'RETURN' })
+        });
+
+        // Pending Requests (Current state)
         const pendingRequests = await Request.count({
             where: { status: 'pending' }
         });
 
-        // Last 30 days movements for chart
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const isLongPeriod = false; // We can determine this based on range if needed
+        const dateFormat = 'YYYY-MM-DD';
 
         const movements = await StockMovement.findAll({
-            where: { createdAt: { [Op.gte]: thirtyDaysAgo } },
+            where: whereWithDates({}),
             attributes: [
                 [fn('DATE', col('createdAt')), 'date'],
                 'movement_type',
                 [fn('SUM', col('total_amount')), 'total'],
-                [fn('COUNT', col('id')), 'count'],
             ],
             group: [fn('DATE', col('createdAt')), 'movement_type'],
             order: [[fn('DATE', col('createdAt')), 'ASC']],
             raw: true,
-        });
-
-        // 1-month revenue
-        const monthlyRevenue = await StockMovement.findOne({
-            where: {
-                movement_type: 'OUT',
-                createdAt: { [Op.gte]: thirtyDaysAgo }
-            },
-            attributes: [[fn('SUM', col('total_amount')), 'monthly_revenue']],
-            raw: true,
-        });
-
-        // 1-month expense
-        const monthlyExpense = await StockMovement.findOne({
-            where: {
-                movement_type: 'IN',
-                createdAt: { [Op.gte]: thirtyDaysAgo }
-            },
-            attributes: [[fn('SUM', col('total_amount')), 'monthly_expense']],
-            raw: true,
-        });
-
-        const monthlyNetProfit = (parseFloat(monthlyRevenue?.monthly_revenue || 0) - parseFloat(monthlyExpense?.monthly_expense || 0));
-
-        // 1-month requests
-        const monthlyRequests = await Request.count({
-            where: { createdAt: { [Op.gte]: thirtyDaysAgo } }
-        });
-
-        // 1-month debt collected
-        const monthlyDebtCollected = await DebtPayment.findOne({
-            where: { createdAt: { [Op.gte]: thirtyDaysAgo } },
-            attributes: [[fn('SUM', col('amount')), 'monthly_debt_collected']],
-            raw: true,
-        });
-
-        // 1-month products added
-        const monthlyProductsAdded = await Product.count({
-            where: { createdAt: { [Op.gte]: thirtyDaysAgo } }
         });
 
         // Format chart data
@@ -129,12 +151,9 @@ router.get('/stats', async (req, res) => {
         });
         const chartData = Object.values(chartDataMap);
 
-        // Top 5 sotilgan mahsulotlar (oxirgi 30 kun)
+        // Top 5 sotilgan mahsulotlar for period
         const topProductsData = await StockMovement.findAll({
-            where: {
-                movement_type: 'OUT',
-                createdAt: { [Op.gte]: thirtyDaysAgo }
-            },
+            where: whereWithDates({ movement_type: 'OUT' }),
             attributes: ['product_id', [fn('SUM', col('quantity')), 'total_quantity']],
             group: ['product_id'],
             order: [[literal('total_quantity'), 'DESC']],
@@ -162,24 +181,31 @@ router.get('/stats', async (req, res) => {
             });
         }
 
-        res.json({
+        const responseData = {
             totalProducts,
             stockValue: parseFloat(stockValue?.total_value || 0),
             lowStockCount: lowStockProducts.length,
             lowStockProducts,
             totalReceivable: parseFloat(activeDebts?.total_receivable || 0),
             totalPayable: parseFloat(payableDebts?.total_payable || 0),
-            todaySales: parseFloat(todaySales?.today_sales || 0),
+            todaySales: parseFloat(todaySalesValue?.today_sales || 0),
             pendingRequests,
             topProducts,
             chartData,
-            monthlyRevenue: parseFloat(monthlyRevenue?.monthly_revenue || 0),
-            monthlyExpense: parseFloat(monthlyExpense?.monthly_expense || 0),
-            monthlyNetProfit,
-            monthlyRequests,
-            monthlyDebtCollected: parseFloat(monthlyDebtCollected?.monthly_debt_collected || 0),
-            monthlyProductsAdded,
-        });
+            revenue: parseFloat(revenue),
+            expense: parseFloat(expense),
+            netProfit,
+            requests: periodicalRequests,
+            debtCollected: parseFloat(periodicalDebtCollected),
+            productsAdded: periodicalProductsAdded,
+            returnsCount: periodicalReturns,
+        };
+
+        console.log('--- SERVER RESPONSE START ---');
+        console.log(JSON.stringify(responseData, null, 2));
+        console.log('--- SERVER RESPONSE END ---');
+
+        res.json(responseData);
     } catch (error) {
         console.error('Dashboard stats error:', error);
         res.status(500).json({ error: 'Dashboard ma\'lumotlarini olishda xatolik' });
