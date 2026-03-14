@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, Package, X, ArrowDownToLine, ShoppingCart, RotateCcw } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
