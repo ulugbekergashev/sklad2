@@ -30,7 +30,14 @@ export const Product = sequelize.define('Product', {
     location: { type: DataTypes.STRING },
     image_url: { type: DataTypes.TEXT },
     category_id: { type: DataTypes.INTEGER, references: { model: 'categories', key: 'id' } },
-}, { tableName: 'products', timestamps: true });
+}, { 
+    tableName: 'products', 
+    timestamps: true,
+    indexes: [
+        { fields: ['createdAt'] },
+        { fields: ['category_id'] }
+    ]
+});
 
 export const Supplier = sequelize.define('Supplier', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -55,7 +62,17 @@ export const StockMovement = sequelize.define('StockMovement', {
     created_by: { type: DataTypes.INTEGER, references: { model: 'users', key: 'id' } },
     supplier_id: { type: DataTypes.INTEGER, references: { model: 'suppliers', key: 'id' } },
     counterparty_name: { type: DataTypes.STRING },
-}, { tableName: 'stock_movements', timestamps: true });
+}, { 
+    tableName: 'stock_movements', 
+    timestamps: true,
+    indexes: [
+        { fields: ['product_id'] },
+        { fields: ['movement_type'] },
+        { fields: ['createdAt'] },
+        { fields: ['supplier_id'] },
+        { fields: ['created_by'] }
+    ]
+});
 
 export const Debt = sequelize.define('Debt', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -70,7 +87,16 @@ export const Debt = sequelize.define('Debt', {
     due_date: { type: DataTypes.DATE },
     description: { type: DataTypes.TEXT },
     created_by: { type: DataTypes.INTEGER, references: { model: 'users', key: 'id' } },
-}, { tableName: 'debts', timestamps: true });
+}, { 
+    tableName: 'debts', 
+    timestamps: true,
+    indexes: [
+        { fields: ['status'] },
+        { fields: ['debt_type'] },
+        { fields: ['remaining_amount'] },
+        { fields: ['createdAt'] }
+    ]
+});
 
 export const DebtPayment = sequelize.define('DebtPayment', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -108,7 +134,15 @@ export const Request = sequelize.define('Request', {
     status: { type: DataTypes.ENUM('pending', 'completed', 'cancelled'), defaultValue: 'pending' },
     notes: { type: DataTypes.TEXT },
     created_by: { type: DataTypes.INTEGER, references: { model: 'users', key: 'id' } },
-}, { tableName: 'requests', timestamps: true });
+}, { 
+    tableName: 'requests', 
+    timestamps: true,
+    indexes: [
+        { fields: ['status'] },
+        { fields: ['product_id'] },
+        { fields: ['createdAt'] }
+    ]
+});
 
 // ========== RELATIONSHIPS ==========
 

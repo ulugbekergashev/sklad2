@@ -6,22 +6,17 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Dashboard({ token }) {
+    const [dateRange, setDateRange] = useState({ start: thirtyDaysAgo, end: today });
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
-    
-    const today = new Date().toISOString().split('T')[0];
-    const thirtyDaysAgo = new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
-    
-    const [startDate, setStartDate] = useState(thirtyDaysAgo);
-    const [endDate, setEndDate] = useState(today);
 
     useEffect(() => {
-        if (startDate && endDate) {
-            fetchStats();
+        if (dateRange.start && dateRange.end) {
+            fetchStats(dateRange.start, dateRange.end);
         }
-    }, [startDate, endDate]);
+    }, [dateRange.start, dateRange.end]);
 
-    const fetchStats = async () => {
+    const fetchStats = async (startDate, endDate) => {
         try {
             setLoading(true);
             const url = `/api/dashboard/stats?startDate=${startDate}&endDate=${endDate}`;
@@ -64,8 +59,8 @@ export default function Dashboard({ token }) {
                         <Calendar size={16} style={{ color: 'var(--text-secondary)' }} />
                         <input
                             type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
+                            value={dateRange.start}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
                             style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none', fontSize: '14px', fontWeight: 500, width: '130px' }}
                         />
                     </div>
@@ -73,8 +68,8 @@ export default function Dashboard({ token }) {
                     <div className="flex items-center gap-2">
                         <input
                             type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
+                            value={dateRange.end}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
                             style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none', fontSize: '14px', fontWeight: 500, width: '130px' }}
                         />
                     </div>
