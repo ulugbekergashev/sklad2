@@ -1,12 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
     Package, TrendingUp, TrendingDown, AlertTriangle, DollarSign,
-    ShoppingCart, Clock, Activity, CheckCircle, RotateCcw, Calendar, Landmark, Star
-} from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-
-import {
-    Package, TrendingUp, TrendingDown, AlertTriangle, DollarSign,
     ShoppingCart, Clock, Activity, CheckCircle, RotateCcw, Calendar, Landmark, Star,
     ChevronDown, Filter, Zap
 } from 'lucide-react';
@@ -14,7 +8,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 // Custom Debounce Hook
 function useDebounce(value, delay) {
-    const [debouncedValue, setDebouncedValue] = React.useState(value);
+    const [debouncedValue, setDebouncedValue] = useState(value);
     useEffect(() => {
         const handler = setTimeout(() => setDebouncedValue(value), delay);
         return () => clearTimeout(handler);
