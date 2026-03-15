@@ -6,6 +6,9 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Dashboard({ token }) {
+    const today = new Date().toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+
     const [dateRange, setDateRange] = useState({ start: thirtyDaysAgo, end: today });
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
