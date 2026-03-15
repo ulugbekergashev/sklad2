@@ -14,22 +14,28 @@ export default function Dashboard({ token }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        const controller = new AbortController();
         if (dateRange.start && dateRange.end) {
-            fetchStats(dateRange.start, dateRange.end);
+            fetchStats(dateRange.start, dateRange.end, controller.signal);
         }
+        return () => controller.abort();
     }, [dateRange.start, dateRange.end]);
 
-    const fetchStats = async (startDate, endDate) => {
+    const fetchStats = async (startDate, endDate, signal) => {
         try {
             setLoading(true);
             const url = `/api/dashboard/stats?startDate=${startDate}&endDate=${endDate}`;
             const res = await fetch(url, {
                 headers: { Authorization: `Bearer ${token}` },
+                signal
             });
+            if (!res.ok) throw new Error('Fetch failed');
             const data = await res.json();
             setStats(data);
         } catch (err) {
-            console.error('Dashboard fetch error:', err);
+            if (err.name !== 'AbortError') {
+                console.error('Dashboard fetch error:', err);
+            }
         } finally {
             setLoading(false);
         }
@@ -44,7 +50,12 @@ export default function Dashboard({ token }) {
     }
 
     return (
-        <div id="unified-dashboard-v3" style={{ animation: 'fadeIn 0.5s ease-out' }}>
+        <div id="unified-dashboard-v3" style={{ 
+            animation: 'fadeIn 0.5s ease-out',
+            opacity: loading ? 0.6 : 1,
+            transition: 'opacity 0.2s ease-in-out',
+            pointerEvents: loading ? 'none' : 'auto'
+        }}>
             <div className="page-header" style={{ marginBottom: '32px' }}>
                 <div>
                     <h1 className="page-title">Dashboard</h1>

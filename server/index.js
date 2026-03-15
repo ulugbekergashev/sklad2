@@ -65,13 +65,40 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Helper to ensure indexes in production (where sync is disabled)
+const applyProductionIndexes = async () => {
+    const indexes = [
+        'CREATE INDEX IF NOT EXISTS "idx_sm_created" ON "stock_movements" ("createdAt")',
+        'CREATE INDEX IF NOT EXISTS "idx_sm_type" ON "stock_movements" ("movement_type")',
+        'CREATE INDEX IF NOT EXISTS "idx_sm_pid" ON "stock_movements" ("product_id")',
+        'CREATE INDEX IF NOT EXISTS "idx_debts_status" ON "debts" ("status")',
+        'CREATE INDEX IF NOT EXISTS "idx_debts_type" ON "debts" ("debt_type")',
+        'CREATE INDEX IF NOT EXISTS "idx_debts_created" ON "debts" ("createdAt")',
+        'CREATE INDEX IF NOT EXISTS "idx_req_status" ON "requests" ("status")',
+        'CREATE INDEX IF NOT EXISTS "idx_req_created" ON "requests" ("createdAt")',
+        'CREATE INDEX IF NOT EXISTS "idx_prod_created" ON "products" ("createdAt")'
+    ];
+    
+    for (const sql of indexes) {
+        try {
+            await sequelize.query(sql);
+        } catch (err) {
+            console.error('Index creation error:', err.message);
+        }
+    }
+};
+
 // Database and Server Init
 const initServer = async () => {
     try {
         await sequelize.authenticate();
         console.log('✅ Database ulanishi muvaffaqiyatli');
 
-        if (!process.env.VERCEL) {
+        if (process.env.VERCEL) {
+            // Manually ensure indexes in serverless env
+            await applyProductionIndexes();
+            console.log('✅ Production indekslari tekshirildi');
+        } else {
             await sequelize.sync({ alter: true });
             console.log('✅ Database jadvallari sinxronlashtirildi');
         }
